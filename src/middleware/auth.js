@@ -1,26 +1,22 @@
-import jwt from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
+
+const ACCESS_TOKEN_TTL = process.env.JWT_EXPIRES_IN || "1h";
 
 export function signToken(user) {
+  const sub = user?._id?.toString?.() ?? String(user?._id);
   return jwt.sign(
-    {
-      sub: user._id.toString(),
-      role: user.role,
-      email: user.email,
-    },
+    { sub, role: user.role, email: user.email },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES || '1d' },
+    { expiresIn: ACCESS_TOKEN_TTL, algorithm: "HS256" }
   );
 }
 
-export function requireJWT(passport) {
-  return passport.authenticate('jwt', { session: false });
+export function verifyToken(token) {
+  return jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
 }
 
-export function requireRole(...roles) {
-  return (req, res, next) => {
-    const user = req.user;
-    if (!user) return res.status(401).json({ status: 'error', error: 'No autenticado' });
-    if (!roles.includes(user.role)) return res.status(403).json({ status: 'error', error: 'No autorizado' });
-    next();
-  };
+export function getJwtFromReq(req) {
+  return req?.cookies?.jwt || (req?.headers?.authorization?.startsWith("Bearer ")
+    ? req.headers.authorization.split(" ")[1]
+    : null);
 }

@@ -1,10 +1,7 @@
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
-import { User } from '../models/User.js';
-
+import User from '../models/User.js';
 function cookieExtractor(req) {
-  let token = null;
-  if (req && req.cookies && req.cookies['jwt']) token = req.cookies['jwt'];
-  return token;
+  return req?.cookies?.jwt ?? null;
 }
 
 export function initPassportJWT(passport) {
@@ -14,15 +11,25 @@ export function initPassportJWT(passport) {
       ExtractJwt.fromAuthHeaderAsBearerToken(),
     ]),
     secretOrKey: process.env.JWT_SECRET,
+    algorithms: ['HS256'],
+    ignoreExpiration: false,
   };
 
-  passport.use('jwt', new JwtStrategy(opts, async (payload, done) => {
-    try {
-      const user = await User.findById(payload.sub).populate('cart');
-      if (!user) return done(null, false, { message: 'Usuario no encontrado' });
-      return done(null, user);
-    } catch (err) {
-      return done(err, false);
-    }
-  }));
+  passport.use(
+    'jwt',
+    new JwtStrategy(opts, async (payload, done) => {
+      try {
+        // payload.sub debe venir del token (signToken)
+        const user = await User.findById(payload.sub)
+          .select('-password')    
+          .populate('cart')
+          .lean({ virtuals: true }); 
+
+        if (!user) return done(null, false, { message: 'Usuario no encontrado' });
+        return done(null, user);
+      } catch (err) {
+        return done(err, false);
+      }
+    })
+  );
 }
